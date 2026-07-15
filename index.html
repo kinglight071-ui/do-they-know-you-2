@@ -4,16 +4,25 @@
 <meta charset="UTF-8">
 <title>Do They Know You?</title>
 
+<!-- ============================================================
+     FIREBASE SETUP — fill this in before deploying to GitHub Pages
+     1. Go to https://console.firebase.google.com, create a free project
+     2. Build > Firestore Database > Create database > Start in test mode
+     3. Project settings (gear icon) > General > "Your apps" > Add app > Web (</>) 
+     4. Copy the firebaseConfig object it gives you and paste it below,
+        replacing the placeholder values.
+     ============================================================ -->
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
 <script>
   const firebaseConfig = {
-    apiKey: "1:799522949768:web:9cc82d3f262c1a56fb2d3d",
-  authDomain: "light-2cc91.firebaseapp.com",
-  projectId: "light-2cc91",
-  storageBucket: "light-2cc91.firebasestorage.app",
-  messagingSenderId: "799522949768",
-  appId: "1:799522949768:web:9cc82d3f262c1a56fb2d3d"
+    apiKey: "AIzaSyDUCwzsZTi6XqdBCtEuHQisbAZZn490crI",
+    authDomain: "light-2cc91.firebaseapp.com",
+    projectId: "light-2cc91",
+    storageBucket: "light-2cc91.firebasestorage.app",
+    messagingSenderId: "799522949768",
+    appId: "1:799522949768:web:9cc82d3f262c1a56fb2d3d",
+    measurementId: "G-MBT8ZRFMPM"
   };
   firebase.initializeApp(firebaseConfig);
   const db = firebase.firestore();
@@ -176,7 +185,62 @@ button.btn{
   transition:transform .12s ease, filter .12s ease;
 }
 button.btn:hover{transform:translateY(-2px); filter:brightness(1.05);}
-button.btn:active{transform:translateY(0);}
+button.btn:active{transform:translateY(0) scale(0.96);}
+
+@keyframes fadeSlideUp{
+  from{opacity:0; transform:translateY(16px);}
+  to{opacity:1; transform:translateY(0);}
+}
+@keyframes popIn{
+  0%{opacity:0; transform:scale(0.82);}
+  65%{opacity:1; transform:scale(1.05);}
+  100%{transform:scale(1);}
+}
+@keyframes shakeX{
+  10%,90%{transform:translateX(-2px);}
+  20%,80%{transform:translateX(4px);}
+  30%,50%,70%{transform:translateX(-7px);}
+  40%,60%{transform:translateX(7px);}
+}
+@keyframes correctPulse{
+  0%{transform:scale(1);}
+  45%{transform:scale(1.035);}
+  100%{transform:scale(1);}
+}
+@keyframes codeReveal{
+  0%{opacity:0; transform:scale(0.9) rotate(-1deg);}
+  60%{opacity:1; transform:scale(1.03) rotate(0.5deg);}
+  100%{transform:scale(1) rotate(0);}
+}
+
+.card{ animation: fadeSlideUp 0.45s ease both; }
+.eyebrow{ animation: fadeSlideUp 0.4s ease both; }
+h1{ animation: fadeSlideUp 0.5s ease both; }
+.choice-card{ animation: fadeSlideUp 0.45s ease both; }
+.choice-card:nth-of-type(2){ animation-delay:0.08s; }
+.answer-option{ animation: fadeSlideUp 0.32s ease both; }
+.answer-option:nth-of-type(1){ animation-delay:0.02s; }
+.answer-option:nth-of-type(2){ animation-delay:0.07s; }
+.answer-option:nth-of-type(3){ animation-delay:0.12s; }
+.answer-option:nth-of-type(4){ animation-delay:0.17s; }
+.answer-option.correct{ animation: correctPulse 0.4s ease; }
+.answer-option.wrong{ animation: shakeX 0.4s ease; }
+.score-num{ animation: popIn 0.55s cubic-bezier(.34,1.56,.64,1) both; }
+.link-box{ animation: codeReveal 0.5s cubic-bezier(.34,1.56,.64,1) both; }
+
+.progress-track{
+  background:var(--paper-dim);
+  border-radius:4px;
+  height:7px;
+  overflow:hidden;
+  margin:6px 0 4px;
+}
+.progress-fill{
+  background:var(--coral);
+  height:100%;
+  border-radius:4px;
+  transition:width 0.4s cubic-bezier(.34,1.2,.64,1);
+}
 .btn-primary{background:var(--coral); color:#fff;}
 .btn-secondary{background:var(--ink); color:var(--mustard);}
 .btn-ghost{background:transparent; color:var(--paper); border:2px solid rgba(251,247,238,0.4); }
@@ -399,11 +463,48 @@ async function saveResults(code, results){
   }catch(e){ console.error('saveResults failed', e); return false; }
 }
 
+// ---------- Sound effects (synthesized, no external files needed) ----------
+let audioCtx = null;
+function getAudioCtx(){
+  if(!audioCtx){
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if(!AC) return null;
+    audioCtx = new AC();
+  }
+  if(audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+function playTone(freq, startOffset, duration, type, gainVal){
+  try{
+    const ctx = getAudioCtx();
+    if(!ctx) return;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.value = freq;
+    const t0 = ctx.currentTime + (startOffset || 0);
+    gain.gain.setValueAtTime(gainVal || 0.12, t0);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(t0);
+    osc.stop(t0 + duration + 0.03);
+  }catch(e){ /* audio unavailable, fail silently */ }
+}
+function playClick(){ playTone(650, 0, 0.07, 'square', 0.05); }
+function playCorrect(){ playTone(523.25, 0, 0.12, 'sine', 0.13); playTone(783.99, 0.09, 0.2, 'sine', 0.13); }
+function playWrong(){ playTone(220, 0, 0.28, 'sawtooth', 0.1); }
+function playSuccess(){ playTone(440, 0, 0.1, 'sine', 0.1); playTone(659.25, 0.09, 0.18, 'sine', 0.1); }
+function playFanfare(){
+  [523.25, 659.25, 783.99, 1046.5].forEach((f,i)=>playTone(f, i*0.11, 0.2, 'sine', 0.12));
+}
+
 function render(){
   if(state.screen === 'home') return renderHome();
   if(state.screen === 'create') return renderCreate();
   if(state.screen === 'created') return renderCreated();
   if(state.screen === 'enterCode') return renderEnterCode();
+  if(state.screen === 'checkResults') return renderCheckResults();
   if(state.screen === 'takeQuiz') return renderTakeQuiz();
   if(state.screen === 'results') return renderResults();
 }
@@ -430,16 +531,50 @@ function renderHome(){
       <div class="leader-row"><span>3</span><span style="flex:1;margin-left:10px;">They open it, enter their name, guess your answers, and get scored instantly.</span></div>
       <div class="leader-row"><span>4</span><span style="flex:1;margin-left:10px;">Everyone's score lands on one shared board — see who really knows you.</span></div>
     </div>
+    <button class="small-link" onclick="goCheckResults()">Made a quiz already? Check your results &rarr;</button>
   `;
 }
 
+function goCheckResults(){
+  playClick();
+  state = { screen:'checkResults', code:'', error:'' };
+  render();
+}
+
+function renderCheckResults(){
+  app.innerHTML = `
+    <div class="eyebrow">Come back anytime</div>
+    <h1>Check your <em>results</em></h1>
+    <div class="card">
+      <label>Enter your quiz code</label>
+      <input type="text" placeholder="e.g. K7RXT" value="${esc(state.code)}" style="text-transform:uppercase;" oninput="state.code=this.value.toUpperCase()">
+      <p class="hint">This is the same code from your quiz link — the part after #quiz=</p>
+      ${state.error ? `<div class="error-msg">${esc(state.error)}</div>` : ''}
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="checkResultsSubmit()">View results</button>
+        <button class="btn btn-ghost" onclick="state={screen:'home'};render()" style="color:#888;border-color:#ccc;">Cancel</button>
+      </div>
+    </div>
+  `;
+}
+
+async function checkResultsSubmit(){
+  const code = state.code.trim().toUpperCase();
+  if(!code){ state.error = 'Enter a code first.'; render(); return; }
+  app.innerHTML = `<p class="loading">Looking up your quiz...</p>`;
+  const quiz = await loadQuiz(code);
+  if(!quiz){ state = { screen:'checkResults', code, error:"Couldn't find a quiz with that code." }; render(); return; }
+  await viewLeaderboard(code);
+}
+
 function goCreate(){
+  playClick();
   state = { screen:'create', name:'', questions:[ blankQ() ], showBank:false };
   render();
 }
 function blankQ(){ return { q:'', correct:'', correctImg:'', d1:'', d1Img:'', d2:'', d2Img:'', d3:'', d3Img:'' }; }
 
-function toggleBank(){ state.showBank = !state.showBank; render(); }
+function toggleBank(){ playClick(); state.showBank = !state.showBank; render(); }
 
 function useBankQuestion(index){
   const item = QUESTION_BANK[index];
@@ -463,6 +598,7 @@ function addRandomQuestions(n){
 }
 
 function goEnterCode(){
+  playClick();
   state = { screen:'enterCode', code:'', error:'' };
   render();
 }
@@ -528,8 +664,8 @@ function renderCreate(){
 }
 
 function updateQ(i, field, val){ state.questions[i][field] = val; }
-function addQ(){ state.questions.push(blankQ()); render(); }
-function removeQ(i){ state.questions.splice(i,1); render(); }
+function addQ(){ playClick(); state.questions.push(blankQ()); render(); }
+function removeQ(i){ playClick(); state.questions.splice(i,1); render(); }
 
 async function submitQuiz(){
   if(!state.name.trim()){ state.error = 'Add your name so friends know whose quiz this is.'; render(); return; }
@@ -557,6 +693,7 @@ async function submitQuiz(){
   const ok = await saveQuiz(code, quiz);
   if(!ok){ state.error = "Couldn't save the quiz — try again."; render(); return; }
   await saveResults(code, []);
+  playSuccess();
   state = { screen:'created', code, quiz };
   render();
 }
@@ -579,11 +716,16 @@ function renderCreated(){
         <button class="btn btn-secondary" onclick="viewLeaderboard('${state.code}')">See who's answered</button>
       </div>
     </div>
+    <div class="card">
+      <label style="margin-top:0;">⚠️ Save this before you close the tab</label>
+      <p class="hint" style="margin-top:0;">Your quiz code is <strong>${esc(state.code)}</strong>. Once you leave this page, this is the only way to check back on your results later — use "Check your results" on the home screen and enter this code.</p>
+    </div>
     <button class="small-link" onclick="state={screen:'home'};render()">&larr; Back home</button>
   `;
 }
 
 function copyLink(){
+  playClick();
   const link = linkForCode(state.code);
   navigator.clipboard.writeText(link).catch(()=>{});
   const btn = event.target;
@@ -668,6 +810,7 @@ function renderTakeQuiz(){
   app.innerHTML = `
     <div class="eyebrow">${esc(state.quiz.creatorName)}'s quiz</div>
     <div class="progress">Question ${state.current+1} of ${total}</div>
+    <div class="progress-track"><div class="progress-fill" style="width:${Math.round(((state.current)/total)*100)}%"></div></div>
     <div class="card">
       <h1 style="font-size:1.5rem; margin-bottom:18px;">${esc(q.q)}</h1>
       <div id="optionsWrap">
@@ -685,6 +828,7 @@ function renderTakeQuiz(){
 
 function confirmName(){
   if(!state.takerName.trim()){ state.nameError = 'Enter your name to continue.'; render(); return; }
+  playClick();
   state.nameError = '';
   state.nameConfirmed = true;
   render();
@@ -695,6 +839,7 @@ function pickOption(i){
   state.locked = true;
   const chosen = state.options[i];
   state.answers.push({ question: state.orderedQuestions[state.current].q, chosenText: chosen.text, correct: chosen.isCorrect });
+  if(chosen.isCorrect) playCorrect(); else playWrong();
 
   const buttons = document.querySelectorAll('.answer-option');
   buttons.forEach((b, idx) => {
@@ -722,6 +867,7 @@ async function finishQuiz(){
   const results = await loadResults(state.code);
   const updated = [...results, { name: state.takerName.trim(), score, total, submittedAt: Date.now() }];
   await saveResults(state.code, updated);
+  playFanfare();
   state = { screen:'results', code: state.code, quiz: state.quiz, results: updated, justSubmitted:true, myScore:score, myTotal:total, myName:state.takerName.trim(), answers: state.answers };
   render();
 }
@@ -753,6 +899,23 @@ function renderResults(){
       <button class="btn btn-ghost" onclick="state={screen:'home'};render()">Back home</button>
     </div>
   `;
+  if(state.justSubmitted) animateScoreCount(state.myScore);
+}
+
+function animateScoreCount(target){
+  const el = document.querySelector('.score-num');
+  if(!el) return;
+  const suffix = '/' + state.myTotal;
+  const durationMs = 600;
+  const start = performance.now();
+  function step(now){
+    const progress = Math.min(1, (now - start) / durationMs);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    const current = Math.round(eased * target);
+    el.textContent = current + suffix;
+    if(progress < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
 }
 
 // If the URL contains a shared quiz link (#quiz=CODE), jump straight into taking that quiz.
